@@ -77,7 +77,7 @@ dependencies = [
     #           [standard] extra brings watchfiles (for --reload),
     #           httptools, uvloop, and websockets — all needed for the
     #           documented dev workflow.
-    "fastapi>=0.110",
+    "fastapi[standard]>=0.110",
     "uvicorn[standard]>=0.29",
 
     # --- CLI ---
