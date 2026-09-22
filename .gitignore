@@ -1,0 +1,97 @@
+# filename: .gitignore
+# title: Version-Control Ignore List
+# description:
+#     Tells Git which files and folders must never be committed to the
+#     merged VEDA repository. Every pattern here is deliberate. Do not
+#     remove an entry without knowing why it was added.
+#
+# source:
+#     AUTHORED — veda's repo had no committed .gitignore, and the
+#     personal prototype's .gitignore was not uploaded. This list is
+#     built from standard Python practice plus the specific rules
+#     required by this project.
+#
+# notes:
+#     - The most important entry is ".env". The personal prototype's
+#       .env file contains a real email address and must never be
+#       committed. The template ".env.example" IS committed; it holds
+#       placeholders only.
+#     - The archive/ folders intentionally DO get committed. They
+#       contain the two original prototypes as read-only references.
+#       Their own .venv/ and .env files, if present, are excluded by
+#       the patterns below.
+
+# --------------------------------------------------------------------
+# Secrets and local configuration
+# --------------------------------------------------------------------
+# The real .env file holds SEC_API_USER_AGENT (name + email) and any
+# future secrets. It is per-developer and must never be committed.
+# .env.example is the committed template and is NOT ignored.
+.env
+*.env
+!.env.example
+
+# --------------------------------------------------------------------
+# Python virtual environments
+# --------------------------------------------------------------------
+# Any virtual environment created inside the project. Excluded so the
+# repository does not carry thousands of installed package files.
+.venv/
+venv/
+env/
+ENV/
+
+# --------------------------------------------------------------------
+# Python bytecode and caches
+# --------------------------------------------------------------------
+# Generated at import time. Never source. Recreated automatically.
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --------------------------------------------------------------------
+# Packaging and build artefacts
+# --------------------------------------------------------------------
+# Produced by pip install -e . and by building a distribution. Never
+# committed.
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# --------------------------------------------------------------------
+# Test and tool caches
+# --------------------------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# --------------------------------------------------------------------
+# IDE and OS files
+# --------------------------------------------------------------------
+# Editor-specific directories. Not source.
+.idea/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --------------------------------------------------------------------
+# Local output
+# --------------------------------------------------------------------
+# Files written by the CLI's --output flag, and any local scratch
+# JSON. Not part of the repository. Named with a leading underscore
+# or explicitly matched.
+*.local.json
+_output/
+packet.json
+test_run.txt
+failures.txt

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VEDA - Vendor Economic Dependency Assessment</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #0f1419;
+    --surface: #171d24;
+    --surface-2: #1f2933;
+    --border: #2d3742;
+    --border-strong: #3d4a57;
+    --text: #e5e9ec;
+    --text-dim: #8b98a6;
+    --text-faint: #5f6c7a;
+    --accent: #4a9eff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --orange: #db6d28;
+    --red: #f85149;
+    --purple: #a371f7;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { padding-bottom: 24px; margin-bottom: 32px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 28px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--text-dim); font-size: 14px; }
+  form { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 32px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .field input[type="text"], .field input[type="number"], .field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; color: var(--text); font-size: 14px; font-family: inherit; transition: border-color 0.15s ease; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+  .radio-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-dim); padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; transition: all 0.15s ease; text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .radio-group input[type="radio"] { accent-color: var(--accent); }
+  .radio-group label:hover { border-color: var(--border-strong); }
+  .radio-group label:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
+  .actions { display: flex; gap: 12px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  button { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 10px 24px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s ease; }
+  button:hover:not(:disabled) { background: #357fd6; }
+  button:disabled { opacity: 0.6; cursor: wait; }
+  .status-msg { color: var(--text-dim); font-size: 13px; margin-left: 8px; }
+  .status-msg.error { color: var(--red); }
+  .status-msg.success { color: var(--green); }
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .section h2 { margin: 0 0 16px; font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--mono); }
+  .badge.supported { background: var(--green); color: #fff; }
+  .badge.supported_with_limitations { background: var(--yellow); color: #1a1a1a; }
+  .badge.conflicting_evidence { background: var(--orange); color: #fff; }
+  .badge.insufficient_evidence { background: var(--red); color: #fff; }
+  .badge.requires_human_review { background: var(--purple); color: #fff; }
+  .badge.live { background: var(--green); color: #fff; }
+  .badge.fixture { background: var(--border-strong); color: var(--text-dim); }
+  .badge.status-supported { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge.status-inferred { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .badge.confidence-high { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge.confidence-medium { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .badge.confidence-low { background: rgba(248,81,73,0.15); color: var(--red); }
+  .vendor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; }
+  .field-row { display: flex; flex-direction: column; gap: 2px; }
+  .field-row .label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .field-row .value { font-size: 14px; color: var(--text); word-break: break-word; }
+  .field-row .value.mono { font-family: var(--mono); font-size: 13px; }
+  .field-row .value a { color: var(--accent); text-decoration: none; }
+  .field-row .value a:hover { text-decoration: underline; }
+  .claim-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; background: var(--surface-2); transition: border-color 0.15s ease; }
+  .claim-card:last-child { margin-bottom: 0; }
+  .claim-card:hover { border-color: var(--border-strong); }
+  .claim-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .claim-type { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+  .claim-value { font-size: 22px; font-weight: 700; color: var(--text); margin: 4px 0 12px; font-variant-numeric: tabular-nums; }
+  .claim-value.numeric { font-family: var(--mono); }
+  .claim-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 16px; font-size: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .claim-meta .meta-label { color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; font-size: 10px; }
+  .claim-meta .meta-value { color: var(--text-dim); font-family: var(--mono); }
+  .evidence-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { display: inline-block; padding: 3px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 11px; color: var(--text-dim); cursor: pointer; transition: all 0.15s ease; }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .evidence-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; background: var(--surface-2); transition: all 0.2s ease; }
+  .evidence-card:last-child { margin-bottom: 0; }
+  .evidence-card.highlight { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,158,255,0.15); }
+  .evidence-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .evidence-id { font-family: var(--mono); font-size: 12px; color: var(--text-dim); word-break: break-all; }
+  .evidence-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; font-size: 12px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .evidence-meta .meta-label { color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; font-size: 10px; }
+  .evidence-meta .meta-value { color: var(--text-dim); font-family: var(--mono); word-break: break-all; font-size: 11px; }
+  .evidence-meta .meta-value.empty { color: var(--text-faint); font-style: italic; }
+  .evidence-meta .meta-value a { color: var(--accent); text-decoration: none; }
+  .evidence-meta .meta-value a:hover { text-decoration: underline; }
+  .empty-state { color: var(--text-faint); font-style: italic; font-size: 13px; padding: 8px 0; }
+  .notes-list { list-style: none; padding: 0; margin: 0; }
+  .notes-list li { padding: 10px 12px; background: var(--surface-2); border-left: 3px solid var(--yellow); border-radius: 4px; font-size: 13px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
+  .notes-list li:last-child { margin-bottom: 0; }
+  .providers-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .providers-table th { text-align: left; font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--border); }
+  .providers-table td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .providers-table tr:last-child td { border-bottom: none; }
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; }
+  details[open] { padding-bottom: 20px; }
+  summary { padding: 16px 20px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; list-style: none; user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary:before { content: "+ "; color: var(--accent); font-weight: 700; margin-right: 4px; }
+  details[open] summary:before { content: "\2212 "; }
+  summary:hover { color: var(--text); }
+  details pre { margin: 0 20px; padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--text-dim); overflow-x: auto; max-height: 600px; overflow-y: auto; }
+  .advanced-panel { margin-bottom: 16px; }
+  .advanced-panel summary { padding: 12px 16px; }
+  .advanced-panel .body { padding: 12px 16px 16px; }
+  @media (max-width: 640px) {
+    .container { padding: 16px; }
+    header h1 { font-size: 22px; }
+    .claim-value { font-size: 18px; }
+    .radio-group { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span>VEDA</span> &mdash; Vendor Economic Dependency Assessment</h1>
+    <p>Provenance-aware evidence pipeline. Fixture or live SEC retrieval.</p>
+  </header>
+
+  <form id="assess-form">
+    <div class="form-grid">
+      <div class="field">
+        <label for="vendor">Vendor name</label>
+        <input type="text" id="vendor" value="Lockheed Martin Corp" required>
+      </div>
+      <div class="field">
+        <label for="year">Fiscal year</label>
+        <input type="number" id="year" value="2024" required>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Resolver</label>
+        <div class="radio-group" id="resolver-group">
+          <label><input type="radio" name="resolver" value="fixture" checked><span>fixture</span></label>
+          <label><input type="radio" name="resolver" value="live"><span>live</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Providers</label>
+        <div class="radio-group" id="providers-group">
+          <label><input type="radio" name="providers" value="fixture" checked><span>fixture</span></label>
+          <label><input type="radio" name="providers" value="live"><span>live</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Extractor</label>
+        <div class="radio-group" id="extractor-group">
+          <label><input type="radio" name="extractor" value="rule_based" checked><span>rule_based</span></label>
+          <label title="Reserved for a later phase"><input type="radio" name="extractor" value="composite" disabled><span>composite</span></label>
+        </div>
+      </div>
+    </div>
+    <details class="advanced-panel" id="advanced-panel">
+      <summary>SEC filing options (optional)</summary>
+      <div class="body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="accession">Accession number</label>
+            <input type="text" id="accession" placeholder="0000936468-25-000009">
+          </div>
+          <div class="field">
+            <label for="form">Filing form</label>
+            <input type="text" id="form" placeholder="10-K">
+          </div>
+          <div class="field">
+            <label for="hint">Passage hint</label>
+            <input type="text" id="hint" placeholder="revenues">
+          </div>
+        </div>
+      </div>
+    </details>
+    <div class="field" id="user-agent-field" style="display: none; margin-bottom: 16px;">
+      <label for="user-agent">SEC User-Agent</label>
+      <input type="text" id="user-agent" placeholder="Your Name your_email@example.com">
+    </div>
+    <div class="actions">
+      <button type="submit" id="submit-btn">Assess</button>
+      <span class="status-msg" id="status-msg"></span>
+    </div>
+  </form>
+
+  <div id="result"></div>
+</div>
+<script>
+(function() {
+  "use strict";
+  var form = document.getElementById("assess-form");
+  var submitBtn = document.getElementById("submit-btn");
+  var statusMsg = document.getElementById("status-msg");
+  var result = document.getElementById("result");
+  var userAgentField = document.getElementById("user-agent-field");
+
+  function getRadio(name) {
+    var el = document.querySelector("input[name='" + name + "']:checked");
+    return el ? el.value : null;
+  }
+
+  function updateUserAgentVisibility() {
+    var r = getRadio("resolver");
+    var p = getRadio("providers");
+    userAgentField.style.display = (r === "live" || p === "live") ? "flex" : "none";
+  }
+
+  document.querySelectorAll("input[name='resolver'], input[name='providers']").forEach(function(el) {
+    el.addEventListener("change", updateUserAgentVisibility);
+  });
+
+  function esc(s) {
+    if (s === null || s === undefined) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function fieldRow(label, value, opts) {
+    opts = opts || {};
+    var empty = (value === null || value === undefined || value === "");
+    var vclass = "value" + (opts.mono ? " mono" : "");
+    var inner;
+    if (empty) {
+      inner = '<span class="empty-state">(not captured)</span>';
+    } else if (opts.link) {
+      inner = '<a href="' + esc(value) + '" target="_blank" rel="noopener">' + esc(value) + "</a>";
+    } else {
+      inner = esc(value);
+    }
+    return '<div class="field-row"><div class="label">' + esc(label) + '</div><div class="' + vclass + '">' + inner + "</div></div>";
+  }
+
+  function meta(label, value) {
+    var empty = (value === null || value === undefined || value === "");
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return '<div><div class="meta-label">' + esc(label) + '</div><div class="meta-value empty">(none)</div></div>';
+      }
+      value = value.join(", ");
+      empty = false;
+    }
+    if (empty) {
+      return '<div><div class="meta-label">' + esc(label) + '</div><div class="meta-value empty">(not captured)</div></div>';
+    }
+    if (typeof value === "string" && (value.indexOf("http://") === 0 || value.indexOf("https://") === 0)) {
+      return '<div><div class="meta-label">' + esc(label) + '</div><div class="meta-value"><a href="' + esc(value) + '" target="_blank" rel="noopener">' + esc(value) + "</a></div></div>";
+    }
+    return '<div><div class="meta-label">' + esc(label) + '</div><div class="meta-value">' + esc(value) + "</div></div>";
+  }
+
+  function renderVendor(v) {
+    var h = [];
+    h.push('<div class="section"><h2>Vendor Resolution</h2><div class="vendor-grid">');
+    h.push(fieldRow("Input name", v.input_name));
+    h.push(fieldRow("Resolved name", v.resolved_name));
+    h.push(fieldRow("CIK", v.cik, {mono: true}));
+    h.push(fieldRow("Entity type", v.entity_type));
+    h.push(fieldRow("Resolution status", v.resolution_status));
+    h.push(fieldRow("Resolution method", v.resolution_method));
+    h.push(fieldRow("Confidence", v.resolution_confidence));
+    h.push(fieldRow("Parent entity", v.parent_entity));
+    if (v.sec_browse_url) h.push(fieldRow("SEC EDGAR browse", v.sec_browse_url, {link: true}));
+    if (v.ambiguity_notes) h.push(fieldRow("Ambiguity notes", v.ambiguity_notes));
+    h.push("</div></div>");
+    return h.join("");
+  }
+
+  function renderStatus(p) {
+    var h = [];
+    h.push('<div class="section"><h2>Assessment</h2>');
+    h.push('<div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px;">');
+    h.push('<span class="badge ' + esc(p.assessment_status) + '">' + esc(p.assessment_status) + "</span>");
+    if (p.reporting_period && p.reporting_period.label) {
+      h.push('<span style="color: var(--text-dim); font-family: var(--mono); font-size: 13px;">' + esc(p.reporting_period.label) + "</span>");
+    }
+    h.push("</div>");
+    h.push('<div class="vendor-grid">');
+    if (p.reporting_period) {
+      h.push(fieldRow("Period start", p.reporting_period.start));
+      h.push(fieldRow("Period end", p.reporting_period.end));
+      h.push(fieldRow("Period label", p.reporting_period.label));
+    }
+    h.push("</div></div>");
+    return h.join("");
+  }
+
+  function renderClaims(claims) {
+    var h = [];
+    h.push('<div class="section"><h2>Claims (' + claims.length + ')</h2>');
+    if (claims.length === 0) {
+      h.push('<div class="empty-state">No claims produced.</div>');
+    } else {
+      claims.forEach(function(c) {
+        h.push('<div class="claim-card">');
+        h.push('<div class="claim-header">');
+        h.push('<div class="claim-type">' + esc(c.claim_type) + "</div>");
+        h.push("<div>");
+        h.push('<span class="badge status-' + esc(c.claim_status) + '">' + esc(c.claim_status) + "</span> ");
+        h.push('<span class="badge confidence-' + esc(c.confidence) + '">' + esc(c.confidence) + "</span>");
+        h.push("</div></div>");
+        if (c.value !== null && c.value !== undefined) {
+          var v = (typeof c.value === "number") ? c.value.toLocaleString("en-US") : c.value;
+          h.push('<div class="claim-value numeric">' + esc(v) + " " + esc(c.unit || "") + "</div>");
+        } else {
+          h.push('<div class="claim-value"><span class="empty-state">(no numeric value &mdash; qualitative claim)</span></div>');
+        }
+        h.push('<div class="claim-meta">');
+        h.push('<div><div class="meta-label">Category</div><div class="meta-value">' + esc(c.evidence_category) + "</div></div>");
+        h.push('<div><div class="meta-label">Extraction</div><div class="meta-value">' + esc(c.extraction_method) + "</div></div>");
+        h.push('<div><div class="meta-label">Currency</div><div class="meta-value">' + esc(c.currency || "(none)") + "</div></div>");
+        h.push("</div>");
+        if (c.evidence_ids && c.evidence_ids.length) {
+          h.push('<div class="evidence-chips">');
+          c.evidence_ids.forEach(function(eid) {
+            h.push('<span class="chip" data-target="' + esc(eid) + '">' + esc(eid) + "</span>");
+          });
+          h.push("</div>");
+        }
+        if (c.assumptions && c.assumptions.length) {
+          h.push('<div style="margin-top: 8px; font-size: 12px; color: var(--text-dim);">Assumptions: ' + esc(c.assumptions.join("; ")) + "</div>");
+        }
+        h.push("</div>");
+      });
+    }
+    h.push("</div>");
+    return h.join("");
+  }
+
+  function renderEvidence(evidence) {
+    var h = [];
+    h.push('<div class="section"><h2>Evidence Ledger (' + evidence.length + ')</h2>');
+    if (evidence.length === 0) {
+      h.push('<div class="empty-state">No evidence retrieved.</div>');
+    } else {
+      evidence.forEach(function(ev) {
+        var srcBadge = ev.is_fixture
+          ? '<span class="badge fixture">FIXTURE</span>'
+          : '<span class="badge live">LIVE</span>';
+        h.push('<div class="evidence-card" id="ev-' + esc(ev.evidence_id) + '">');
+        h.push('<div class="evidence-header">');
+        h.push('<div class="evidence-id">' + esc(ev.evidence_id) + "</div>");
+        h.push(srcBadge);
+        h.push("</div>");
+        h.push('<div class="evidence-meta">');
+        h.push(meta("Source type", ev.source_type));
+        h.push(meta("Source name", ev.source_name));
+        h.push(meta("Category", ev.evidence_category));
+        h.push(meta("Retrieval method", ev.retrieval_method));
+        h.push(meta("Raw value", ev.raw_value));
+        h.push(meta("Unit", ev.unit));
+        h.push(meta("Currency", ev.currency));
+        h.push(meta("Accession number", ev.accession_number));
+        h.push(meta("Filing form", ev.form));
+        h.push(meta("XBRL tag", ev.xbrl_tag));
+        h.push(meta("SEC browse URL", ev.sec_browse_url));
+        if (ev.location) {
+          h.push(meta("Field or passage", ev.location.field_or_passage));
+          h.push(meta("Source reference", ev.location.source_reference));
+          h.push(meta("Source URL", ev.location.source_url));
+          h.push(meta("Section", ev.location.section));
+          h.push(meta("Span start", ev.location.span_start));
+          h.push(meta("Span end", ev.location.span_end));
+        }
+        if (ev.document) {
+          h.push(meta("Document ID", ev.document.doc_id));
+          h.push(meta("Document title", ev.document.title));
+          h.push(meta("Document URL", ev.document.url));
+          h.push(meta("Content hash", ev.document.content_hash));
+          h.push(meta("Filing date", ev.document.filing_date));
+          h.push(meta("Filing form (doc)", ev.document.filing_form));
+          h.push(meta("Is fixture (doc)", ev.document.is_fixture));
+        }
+        h.push(meta("Is context only", ev.is_context_only));
+        h.push(meta("Retrieved at", ev.retrieved_at));
+        h.push("</div></div>");
+      });
+    }
+    h.push("</div>");
+    return h.join("");
+  }
+
+  function renderConflicts(conflicts) {
+    var h = [];
+    h.push('<div class="section"><h2>Conflicts (' + conflicts.length + ')</h2>');
+    if (conflicts.length === 0) {
+      h.push('<div class="empty-state">No comparable claims conflict.</div>');
+    } else {
+      conflicts.forEach(function(c) {
+        h.push('<div class="claim-card"><div class="claim-type">' + esc(c.claim_type) + "</div>");
+        h.push('<div class="claim-value numeric">' + esc(c.conflicting_values.join(" vs ")) + "</div>");
+        h.push('<div style="color: var(--text-dim); font-size: 13px;">' + esc(c.reason) + "</div></div>");
+      });
+    }
+    h.push("</div>");
+    return h.join("");
+  }
+
+  function renderMissing(missing) {
+    var h = [];
+    h.push('<div class="section"><h2>Missing Evidence (' + missing.length + ')</h2>');
+    if (missing.length === 0) {
+      h.push('<div class="empty-state">None reported.</div>');
+    } else {
+      missing.forEach(function(m) {
+        h.push('<div class="claim-card"><div class="claim-type">' + esc(m.claim_type) + ' <span style="color: var(--text-dim);">(' + esc(m.reason) + ')</span></div>');
+        h.push('<div style="color: var(--text-dim); font-size: 13px; margin-top: 6px;">' + esc(m.explanation) + "</div>");
+        if (m.sources_checked && m.sources_checked.length) {
+          h.push('<div style="color: var(--text-faint); font-size: 11px; margin-top: 6px;">Sources checked: ' + esc(m.sources_checked.join(", ")) + "</div>");
+        }
+        h.push("</div>");
+      });
+    }
+    h.push("</div>");
+    return h.join("");
+  }
+
+  function renderLimitations(limitations) {
+    if (!limitations || limitations.length === 0) return "";
+    var h = [];
+    h.push('<div class="section"><h2>Limitations</h2><ul style="margin: 0; padding-left: 20px; color: var(--text-dim); font-size: 13px;">');
+    limitations.forEach(function(l) {
+      h.push("<li>" + esc(l) + "</li>");
+    });
+    h.push("</ul></div>");
+    return h.join("");
+  }
+
+  function renderReview(p) {
+    var h = [];
+    if (p.human_review_reason) {
+      h.push('<div class="section" style="border-color: var(--purple); background: rgba(163,113,247,0.08);">');
+      h.push('<h2 style="color: var(--purple);">Human Review Required</h2>');
+      h.push('<div style="color: var(--text); font-size: 14px;">' + esc(p.human_review_reason) + "</div>");
+      h.push("</div>");
+    }
+    if (p.recommended_next_step) {
+      h.push('<div class="section"><h2>Recommended Next Step</h2>');
+      h.push('<div style="color: var(--text-dim); font-size: 14px;">' + esc(p.recommended_next_step) + "</div></div>");
+    }
+    return h.join("");
+  }
+
+  function renderProviders(modes) {
+    var h = [];
+    h.push('<div class="section"><h2>Provider Modes</h2>');
+    h.push('<table class="providers-table"><thead><tr><th>Provider</th><th>Mode</th></tr></thead><tbody>');
+    Object.keys(modes).sort().forEach(function(k) {
+      var m = modes[k];
+      var badge = m === "live" ? '<span class="badge live">LIVE</span>' : '<span class="badge fixture">FIXTURE</span>';
+      h.push("<tr><td>" + esc(k) + "</td><td>" + badge + "</td></tr>");
+    });
+    h.push("</tbody></table></div>");
+    return h.join("");
+  }
+
+  function renderNotes(notes) {
+    if (!notes || notes.length === 0) return "";
+    var h = [];
+    h.push('<div class="section"><h2>Metadata Notes (' + notes.length + ')</h2><ul class="notes-list">');
+    notes.forEach(function(n) {
+      h.push("<li>" + esc(n) + "</li>");
+    });
+    h.push("</ul></div>");
+    return h.join("");
+  }
+
+  function renderRunMetadata(rm) {
+    var h = [];
+    h.push('<div class="section"><h2>Run Metadata</h2><div class="vendor-grid">');
+    h.push(fieldRow("Run ID", rm.run_id, {mono: true}));
+    h.push(fieldRow("Schema version", rm.schema_version));
+    h.push(fieldRow("Pipeline version", rm.pipeline_version));
+    h.push(fieldRow("Started at", rm.started_at));
+    h.push(fieldRow("Finished at", rm.finished_at));
+    h.push(fieldRow("User-Agent", rm.user_agent));
+    h.push("</div></div>");
+    return h.join("");
+  }
+
+  function renderJSON(p) {
+    var h = [];
+    h.push("<details><summary>Machine-readable JSON packet</summary>");
+    h.push("<pre>" + esc(JSON.stringify(p, null, 2)) + "</pre>");
+    h.push("</details>");
+    return h.join("");
+  }
+
+  function render(p) {
+    var h = [];
+    h.push(renderVendor(p.vendor));
+    h.push(renderStatus(p));
+    h.push(renderClaims(p.claims || []));
+    h.push(renderEvidence(p.evidence || []));
+    h.push(renderConflicts(p.conflicts || []));
+    h.push(renderMissing(p.missing_evidence || []));
+    h.push(renderLimitations(p.limitations || []));
+    h.push(renderReview(p));
+    h.push(renderProviders(p.run_metadata.provider_modes || {}));
+    h.push(renderNotes(p.run_metadata.notes || []));
+    h.push(renderRunMetadata(p.run_metadata));
+    h.push(renderJSON(p));
+    return h.join("");
+  }
+
+  function scrollToEvidence(eid) {
+    var el = document.getElementById("ev-" + eid);
+    if (el) {
+      el.scrollIntoView({behavior: "smooth", block: "center"});
+      el.classList.add("highlight");
+      setTimeout(function() { el.classList.remove("highlight"); }, 2000);
+    }
+  }
+
+  result.addEventListener("click", function(e) {
+    if (e.target.classList.contains("chip")) {
+      var target = e.target.getAttribute("data-target");
+      if (target) scrollToEvidence(target);
+    }
+  });
+
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    var vendor = document.getElementById("vendor").value;
+    var year = parseInt(document.getElementById("year").value, 10);
+    var resolver = getRadio("resolver");
+    var providers = getRadio("providers");
+    var extractor = getRadio("extractor");
+    var accession = document.getElementById("accession").value.trim();
+    var form_ = document.getElementById("form").value.trim();
+    var hint = document.getElementById("hint").value.trim();
+    var userAgent = document.getElementById("user-agent").value.trim();
+
+    var body = {
+      company_name: vendor,
+      fiscal_year: year,
+      resolver_mode: resolver,
+      provider_mode: providers,
+      extractor_mode: extractor
+    };
+    if (accession) body.sec_filing_accession_number = accession;
+    if (form_) body.sec_filing_form = form_;
+    if (hint) body.sec_filing_passage_hint = hint;
+
+    submitBtn.disabled = true;
+    statusMsg.textContent = "Running pipeline...";
+    statusMsg.className = "status-msg";
+    result.innerHTML = "";
+
+    var headers = {"Content-Type": "application/json"};
+    if (userAgent && (resolver === "live" || providers === "live")) {
+      headers["X-SEC-User-Agent"] = userAgent;
+    }
+
+    fetch("/assess", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(body)
+    })
+    .then(function(res) {
+      return res.json().then(function(data) { return {ok: res.ok, status: res.status, data: data}; });
+    })
+    .then(function(r) {
+      submitBtn.disabled = false;
+      if (!r.ok) {
+        statusMsg.textContent = "Error " + r.status + ": " + (r.data.detail || "unknown");
+        statusMsg.className = "status-msg error";
+        return;
+      }
+      statusMsg.textContent = "Complete.";
+      statusMsg.className = "status-msg success";
+      result.innerHTML = render(r.data);
+    })
+    .catch(function(err) {
+      submitBtn.disabled = false;
+      statusMsg.textContent = "Request failed: " + err.message;
+      statusMsg.className = "status-msg error";
+    });
+  });
+
+  updateUserAgentVisibility();
+})();
+</script>
+</body>
+</html>

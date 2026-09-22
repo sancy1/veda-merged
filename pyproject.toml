@@ -1,0 +1,140 @@
+# filename: pyproject.toml
+# title: Package Manifest — Merged VEDA System
+# description:
+#     Single source of truth for the merged VEDA package: name, version,
+#     Python requirement, runtime dependencies, test dependencies, the
+#     console-script entrypoint, the src-layout package-discovery rule,
+#     and the pytest configuration.
+#
+#     Every dependency listed here is derived from actual imports in one
+#     of the two source prototypes. Nothing is speculative.
+#
+# source:
+#     MERGED — veda_demo/requirements.txt + vendor-evidence-prototype/requirements.txt
+#     (the personal prototype's requirements.txt upload was corrupted; its
+#      dependency list was reconstructed from imports in its source files)
+#
+# notes:
+#     - readme field is intentionally omitted until README.md exists.
+#       It will be re-added once the file is written near the end of
+#       the merge.
+#     - test extras are installed with:  pip install -e ".[test]"
+#     - the console entrypoint "veda" currently points at a module that
+#       does not exist yet (veda.interfaces.cli). This is expected; the
+#       script will resolve once that file is written in Phase 8.
+
+# --------------------------------------------------------------------
+# Build system
+# --------------------------------------------------------------------
+# setuptools with PEP 621 metadata is the standard modern build backend
+# for a src-layout Python package. "wheel" is listed so the editable
+# install can produce a wheel on first build.
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+# --------------------------------------------------------------------
+# Project metadata and runtime dependencies
+# --------------------------------------------------------------------
+[project]
+name = "veda"
+version = "0.1.0"
+description = "VEDA - Vendor Economic Dependency Assessment. Provenance-aware evidence pipeline."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [
+    { name = "ArcellAI Engineering" }
+]
+
+# Runtime dependencies. Each entry names the package and the earliest
+# version the merged code requires. The version floor is the lowest
+# release of that package that supports every API used in the source
+# prototypes.
+dependencies = [
+    # --- data validation and typed configuration ---
+    # pydantic      : used everywhere for typed models in both prototypes
+    #                 (Vendor, RevenueClaim, EvidencePacket, Assessment,
+    #                 Evidence, Claim, Conflict, ...).
+    # pydantic-settings : used by the personal prototype for the
+    #                 Settings class that loads SEC_API_USER_AGENT from
+    #                 .env without raising at import time.
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+
+    # --- HTTP client ---
+    # httpx : used by the personal prototype's entity resolver and SEC
+    #         client, and by the test suites of both prototypes via
+    #         respx. Chosen over requests because it supports both sync
+    #         and async under one API and has cleaner timeout semantics.
+    "httpx>=0.27",
+
+    # --- HTTP API and server ---
+    # fastapi : used by veda's app/api.py to expose /assess and the four
+    #           pinned demo endpoints, and to serve the dashboard.
+    # uvicorn[standard] : the server that runs the FastAPI app. The
+    #           [standard] extra brings watchfiles (for --reload),
+    #           httptools, uvloop, and websockets — all needed for the
+    #           documented dev workflow.
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+
+    # --- CLI ---
+    # typer : used by the personal prototype's cli.py to build the
+    #         command-line interface from type hints.
+    # rich  : used by the personal prototype's cli.py to render the
+    #         colour-coded panel that shows the human-readable answer.
+    "typer>=0.12",
+    "rich>=13.7",
+]
+
+
+# --------------------------------------------------------------------
+# Test dependencies (optional extra)
+# --------------------------------------------------------------------
+# Installed with:  pip install -e ".[test]"
+# Kept separate from runtime dependencies so a production install does
+# not carry the test toolchain.
+[project.optional-dependencies]
+test = [
+    # pytest : test runner for both prototypes' test suites.
+    # respx  : intercepts httpx calls so no test reaches the live
+    #          network. Used by both prototypes' test suites.
+    "pytest>=8.0",
+    "respx>=0.21",
+]
+
+
+# --------------------------------------------------------------------
+# Console script entrypoint
+# --------------------------------------------------------------------
+# After `pip install -e .`, typing "veda" in the terminal runs
+# app() from src/veda/interfaces/cli.py. This is the merged equivalent
+# of the personal prototype's `python -m prototype.cli` command.
+[project.scripts]
+veda = "veda.interfaces.cli:app"
+
+
+# --------------------------------------------------------------------
+# Package discovery (src layout)
+# --------------------------------------------------------------------
+# Tells setuptools to look for importable packages under src/ rather
+# than at the project root. This is why the package lives at
+# src/veda/ and not at ./veda/.
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+# --------------------------------------------------------------------
+# pytest configuration
+# --------------------------------------------------------------------
+# testpaths : where pytest looks for tests by default.
+# pythonpath : adds src/ to sys.path so tests can import veda.*
+#              without an explicit editable install being present.
+# addopts : -ra prints a short summary of non-passing tests at the end
+#           of each run; -q keeps the per-test output compact.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra -q"
