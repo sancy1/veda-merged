@@ -54,7 +54,7 @@
 - **Questions:** NONE EXIST.
 - **Corpus:** NONE EXISTS.
 - **Fixtures:** Empty directories only.
-- **Validation command:** NOT YET DEFINED. Planned: python -m veda.benchmark.validate_bundle --bundle <path>.
+- **Validation command:** PLANNED, not yet implemented: python -m veda.benchmark.validate_bundle --bundle <path>.
 
 ---
 
